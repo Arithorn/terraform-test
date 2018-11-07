@@ -3,6 +3,12 @@
 #  region = "${var.aws_region}"
 #}
 
+provider "vault" {
+  address = "http://127.0.0.1:8200"
+  skip_tls_verify = true
+  token = "7NDjjnJX1SAyx8GJTbBhIHRd"
+}
+
 data "vault_aws_access_credentials" "creds" {
   backend = "aws/creds"
   role    = "aws/creds/my-role"
