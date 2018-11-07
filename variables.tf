@@ -6,10 +6,12 @@ connect.
 
 Example: ~/.ssh/terraform.pub
 DESCRIPTION
+  default = "~/.ssh/terraform.pub"
 }
 
 variable "key_name" {
   description = "Desired name of AWS key pair"
+  default = "terraform"
 }
 
 variable "aws_region" {
