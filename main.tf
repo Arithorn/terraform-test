@@ -1,7 +1,19 @@
 # Specify the provider and access details
+#provider "aws" {
+#  region = "${var.aws_region}"
+#}
+
+data "vault_aws_access_credentials" "creds" {
+  backend = "${vault_aws_secret_backend.aws.path}"
+  role    = "${vault_aws_secret_backend_role.role.name}"
+}
+
 provider "aws" {
+  access_key = "${data.vault_aws_access_credentials.creds.access_key}"
+  secret_key = "${data.vault_aws_access_credentials.creds.secret_key}"
   region = "${var.aws_region}"
 }
+
 
 # Create a VPC to launch our instances into
 resource "aws_vpc" "default" {
