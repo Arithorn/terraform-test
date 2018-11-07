@@ -10,8 +10,8 @@ provider "vault" {
 }
 
 data "vault_aws_access_credentials" "creds" {
-  backend = "aws/creds"
-  role    = "aws/creds/my-role"
+  backend = ""
+  role    = "my-role"
 }
 
 provider "aws" {
