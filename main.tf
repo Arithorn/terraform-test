@@ -42,15 +42,23 @@ resource "aws_route" "internet_access" {
 }
 
 # Create a subnet to launch our instances into
-resource "aws_subnet" "default" {
+resource "aws_subnet" "default_az1" {
+  vpc_id                  = "${aws_vpc.default.id}"
+  cidr_block              = "10.0.0.0/24"
+  availability_zone       = "eu-west-2a"
+  map_public_ip_on_launch = true
+}
+
+resource "aws_subnet" "default_az2" {
   vpc_id                  = "${aws_vpc.default.id}"
   cidr_block              = "10.0.1.0/24"
+  availability_zone       = "eu-west-2b"
   map_public_ip_on_launch = true
 }
 
 resource "aws_subnet" "app_az1" {
   vpc_id                  = "${aws_vpc.default.id}"
-  cidr_block              = "10.0.2.0/24"
+  cidr_block              = "10.0.5.0/24"
   availability_zone       = "eu-west-2a"
   map_public_ip_on_launch = true
 }
@@ -79,8 +87,8 @@ resource "aws_subnet" "db_az2" {
 
 
 # A security group for the ELB so it is accessible via the web
-resource "aws_security_group" "elb" {
-  name        = "sg_elb"
+resource "aws_security_group" "lb" {
+  name        = "sg_lb"
   description = "ELB SG set up by terraform"
   vpc_id      = "${aws_vpc.default.id}"
 
@@ -106,7 +114,7 @@ resource "aws_security_group" "db" {
   description = "Database SG set up by terraform"
   vpc_id      = "${aws_vpc.default.id}"
 
-  # HTTP access from anywhere
+  # MYSQL access from App DMZ
   ingress {
     from_port   = 3306
     to_port     = 3306
@@ -160,11 +168,11 @@ resource "aws_security_group" "default" {
   }
 }
 
-resource "aws_elb" "web" {
-  name = "terraform-example-elb"
+resource "aws_lb" "web" {
+  name = "web lb"
 
-  subnets         = ["${aws_subnet.default.id}"]
-  security_groups = ["${aws_security_group.elb.id}"]
+  subnets         = ["${aws_subnet.default_az1.id}","${aws_subnet.default_az2.id}"]
+  security_groups = ["${aws_security_group.lb.id}"]
   instances       = ["${aws_instance.web.id}"]
 
   listener {
