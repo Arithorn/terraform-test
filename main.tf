@@ -119,6 +119,19 @@ resource "aws_key_pair" "auth" {
   public_key = "${file(var.public_key_path)}"
 }
 
+resource "aws_db_instance" "appdb" {
+  allocated_storage    = 10
+  storage_type         = "gp2"
+  engine               = "mysql"
+  engine_version       = "5.7"
+  instance_class       = "db.t2.micro"
+  name                 = "appdb"
+  username             = "${data.vault_generic_secret.db_secrets.data["username"]}"
+  password             = "${data.vault_generic_secret.db_secrets.data["password"]}"
+  parameter_group_name = "default.mysql5.7"
+}
+
+
 resource "aws_instance" "web" {
   # The connection block tells our provisioner how to
   # communicate with the resource (instance)
