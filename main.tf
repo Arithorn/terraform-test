@@ -51,24 +51,28 @@ resource "aws_subnet" "default" {
 resource "aws_subnet" "app_az1" {
   vpc_id                  = "${aws_vpc.default.id}"
   cidr_block              = "10.0.2.0/24"
+  availability_zone       = "eu-west-2a"
   map_public_ip_on_launch = true
 }
 
 resource "aws_subnet" "db_az1" {
   vpc_id                  = "${aws_vpc.default.id}"
   cidr_block              = "10.0.15.0/24"
+  availability_zone       = "eu-west-2a"
   map_public_ip_on_launch = false
 }
 
 resource "aws_subnet" "app_az2" {
   vpc_id                  = "${aws_vpc.default.id}"
   cidr_block              = "10.0.130.0/24"
+  availability_zone       = "eu-west-2b"
   map_public_ip_on_launch = true
 }
 
 resource "aws_subnet" "db_az2" {
   vpc_id                  = "${aws_vpc.default.id}"
   cidr_block              = "10.0.145.0/24"
+  availability_zone       = "eu-west-2b"
   map_public_ip_on_launch = false
 }
 
