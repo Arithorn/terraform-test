@@ -13,6 +13,10 @@ data "vault_generic_secret" "aws_secrets" {
   path    = "/secret/aws"
 }
 
+data "vault_generic_secret" "db_secrets" {
+  path    = "/secret/db_secrets"
+}
+
 provider "aws" {
   access_key = "${data.vault_generic_secret.aws_secrets.data["access_key"]}"
   secret_key = "${data.vault_generic_secret.aws_secrets.data["secret_key"]}"
