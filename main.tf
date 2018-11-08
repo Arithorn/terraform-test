@@ -48,17 +48,30 @@ resource "aws_subnet" "default" {
   map_public_ip_on_launch = true
 }
 
-resource "aws_subnet" "app" {
+resource "aws_subnet" "app_az1" {
   vpc_id                  = "${aws_vpc.default.id}"
   cidr_block              = "10.0.2.0/24"
   map_public_ip_on_launch = true
 }
 
-resource "aws_subnet" "db" {
+resource "aws_subnet" "db_az1" {
   vpc_id                  = "${aws_vpc.default.id}"
   cidr_block              = "10.0.15.0/24"
+  map_public_ip_on_launch = false
+}
+
+resource "aws_subnet" "app_az2" {
+  vpc_id                  = "${aws_vpc.default.id}"
+  cidr_block              = "10.0.130.0/24"
   map_public_ip_on_launch = true
 }
+
+resource "aws_subnet" "db_az2" {
+  vpc_id                  = "${aws_vpc.default.id}"
+  cidr_block              = "10.0.145.0/24"
+  map_public_ip_on_launch = false
+}
+
 
 
 # A security group for the ELB so it is accessible via the web
@@ -94,7 +107,7 @@ resource "aws_security_group" "db" {
     from_port   = 3306
     to_port     = 3306
     protocol    = "tcp"
-    cidr_blocks = ["10.0.2.0/24"]
+    cidr_blocks = ["10.0.2.0/24","10.0.130.0/24"]
   }
 
   # outbound internet access
@@ -108,7 +121,7 @@ resource "aws_security_group" "db" {
 
 resource "aws_db_subnet_group" "default" {
   name       = "main"
-  subnet_ids = ["${aws_subnet.db.id}"]
+  subnet_ids = ["${aws_subnet.db_az1.id}","${aws_subnet.db_az2.id}"]
 }
 
 # Our default security group to access
@@ -196,7 +209,7 @@ resource "aws_instance" "web" {
   key_name = "${aws_key_pair.auth.id}"
   # Our Security group to allow HTTP and SSH access
   vpc_security_group_ids = ["${aws_security_group.default.id}"]
-  subnet_id = "${aws_subnet.app.id}"
+  subnet_id = "${aws_subnet.app_az1.id}"
 
   # We run a remote provisioner on the instance after creating it.
   # In this case, we just install nginx and start it. By default,
