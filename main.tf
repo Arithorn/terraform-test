@@ -169,18 +169,35 @@ resource "aws_security_group" "default" {
 }
 
 resource "aws_lb" "web" {
-  name = "web lb"
+  name = "web-lb"
 
   subnets         = ["${aws_subnet.default_az1.id}","${aws_subnet.default_az2.id}"]
   security_groups = ["${aws_security_group.lb.id}"]
-  instances       = ["${aws_instance.web.id}"]
 
-  listener {
-    instance_port     = 80
-    instance_protocol = "http"
-    lb_port           = 80
-    lb_protocol       = "http"
+}
+
+resource "aws_lb_listener" "web" {
+  load_balancer_arn = "${aws_lb.web.arn}"
+  port              = "80"
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = "${aws_lb_target_group.web.arn}"
   }
+}
+
+resource "aws_lb_target_group" "web" {
+  name     = "web-target-group"
+  port     = 80
+  protocol = "HTTP"
+  vpc_id   = "${aws_vpc.default.id}"
+}
+
+resource "aws_alb_target_group_attachment" "svc_web" {
+  target_group_arn = "${aws_alb_target_group.web.arn}"
+  target_id        = "${aws_instance.web.id}"  
+  port             = 80
 }
 
 resource "aws_key_pair" "auth" {
