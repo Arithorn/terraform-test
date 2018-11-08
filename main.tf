@@ -48,6 +48,19 @@ resource "aws_subnet" "default" {
   map_public_ip_on_launch = true
 }
 
+resource "aws_subnet" "app" {
+  vpc_id                  = "${aws_vpc.default.id}"
+  cidr_block              = "10.0.2.0/24"
+  map_public_ip_on_launch = true
+}
+
+resource "aws_subnet" "db" {
+  vpc_id                  = "${aws_vpc.default.id}"
+  cidr_block              = "10.0.15.0/24"
+  map_public_ip_on_launch = true
+}
+
+
 # A security group for the ELB so it is accessible via the web
 resource "aws_security_group" "elb" {
   name        = "sg_elb"
@@ -81,7 +94,7 @@ resource "aws_security_group" "db" {
     from_port   = 3306
     to_port     = 3306
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = ["10.0.2.0/24"]
   }
 
   # outbound internet access
@@ -155,6 +168,7 @@ resource "aws_db_instance" "appdb" {
   username             = "${data.vault_generic_secret.db_secrets.data["username"]}"
   password             = "${data.vault_generic_secret.db_secrets.data["password"]}"
   parameter_group_name = "default.mysql5.7"
+  subnet_id = "${aws_subnet.db.id}"
   vpc_security_group_ids = ["${aws_security_group.db.id}"]
 }
 
@@ -165,8 +179,6 @@ resource "aws_instance" "web" {
   connection {
     # The default username for our AMI
     user = "ubuntu"
-
-    # The connection will use the local SSH agent for authentication.
   }
 
   instance_type = "t2.micro"
@@ -177,14 +189,9 @@ resource "aws_instance" "web" {
 
   # The name of our SSH keypair we created above.
   key_name = "${aws_key_pair.auth.id}"
-
   # Our Security group to allow HTTP and SSH access
   vpc_security_group_ids = ["${aws_security_group.default.id}"]
-
-  # We're going to launch into the same subnet as our ELB. In a production
-  # environment it's more common to have a separate private subnet for
-  # backend instances.
-  subnet_id = "${aws_subnet.default.id}"
+  subnet_id = "${aws_subnet.app.id}"
 
   # We run a remote provisioner on the instance after creating it.
   # In this case, we just install nginx and start it. By default,
