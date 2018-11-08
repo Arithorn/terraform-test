@@ -9,14 +9,13 @@ provider "vault" {
   token = "7NDjjnJX1SAyx8GJTbBhIHRd"
 }
 
-data "vault_aws_access_credentials" "creds" {
-  backend = "aws"
-  role    = "my-role"
+data "vault_generic_secret" "aws_secrets" {
+  path    = "/secret/aws"
 }
 
 provider "aws" {
-  access_key = "${data.vault_aws_access_credentials.creds.access_key}"
-  secret_key = "${data.vault_aws_access_credentials.creds.secret_key}"
+  access_key = "${data.vault_generic_secret.aws_secrets.access_key}"
+  secret_key = "${data.vault_generic_secret.aws_secrets.secret_key}"
   region = "${var.aws_region}"
 }
 
