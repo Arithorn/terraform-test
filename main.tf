@@ -173,7 +173,7 @@ resource "aws_db_instance" "appdb" {
   username             = "${data.vault_generic_secret.db_secrets.data["username"]}"
   password             = "${data.vault_generic_secret.db_secrets.data["password"]}"
   parameter_group_name = "default.mysql5.7"
-  aws_db_subnet_group = "${aws_db_subnet_group.default.id}"
+  db_subnet_group_name = "${aws_db_subnet_group.default.name}"
   vpc_security_group_ids = ["${aws_security_group.db.id}"]
 }
 
