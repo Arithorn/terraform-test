@@ -14,8 +14,8 @@ data "vault_generic_secret" "aws_secrets" {
 }
 
 provider "aws" {
-  access_key = "${data.vault_generic_secret.aws_secrets.access_key}"
-  secret_key = "${data.vault_generic_secret.aws_secrets.secret_key}"
+  access_key = "${data.vault_generic_secret.aws_secrets.data["access_key"]}"
+  secret_key = "${data.vault_generic_secret.aws_secrets.data["secret_key"]}"
   region = "${var.aws_region}"
 }
 
