@@ -50,8 +50,8 @@ resource "aws_subnet" "default" {
 
 # A security group for the ELB so it is accessible via the web
 resource "aws_security_group" "elb" {
-  name        = "terraform_example_elb"
-  description = "Used in the terraform"
+  name        = "sg_elb"
+  description = "ELB SG set up by terraform"
   vpc_id      = "${aws_vpc.default.id}"
 
   # HTTP access from anywhere
@@ -71,11 +71,33 @@ resource "aws_security_group" "elb" {
   }
 }
 
+resource "aws_security_group" "db" {
+  name        = "sg_db"
+  description = "Database SG set up by terraform"
+  vpc_id      = "${aws_vpc.default.id}"
+
+  # HTTP access from anywhere
+  ingress {
+    from_port   = 3306
+    to_port     = 3306
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # outbound internet access
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
 # Our default security group to access
 # the instances over SSH and HTTP
 resource "aws_security_group" "default" {
-  name        = "terraform_example"
-  description = "Used in the terraform"
+  name        = "default_sg"
+  description = "Default SG set up by terraform"
   vpc_id      = "${aws_vpc.default.id}"
 
   # SSH access from anywhere
@@ -133,6 +155,7 @@ resource "aws_db_instance" "appdb" {
   username             = "${data.vault_generic_secret.db_secrets.data["username"]}"
   password             = "${data.vault_generic_secret.db_secrets.data["password"]}"
   parameter_group_name = "default.mysql5.7"
+  vpc_security_group_ids = ["${aws_security_group.db.id}"]
 }
 
 
