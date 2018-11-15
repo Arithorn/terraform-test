@@ -9,14 +9,17 @@ provider "vault" {
   token = "7NDjjnJX1SAyx8GJTbBhIHRd"
 }
 
-data "vault_aws_access_credentials" "creds" {
-  backend = "aws"
-  role    = "my-role"
+data "vault_generic_secret" "aws_secrets" {
+  path    = "/secret/aws"
+}
+
+data "vault_generic_secret" "db_secrets" {
+  path    = "/secret/db_secrets"
 }
 
 provider "aws" {
-  access_key = "${data.vault_aws_access_credentials.creds.access_key}"
-  secret_key = "${data.vault_aws_access_credentials.creds.secret_key}"
+  access_key = "${data.vault_generic_secret.aws_secrets.data["access_key"]}"
+  secret_key = "${data.vault_generic_secret.aws_secrets.data["secret_key"]}"
   region = "${var.aws_region}"
 }
 
@@ -39,16 +42,54 @@ resource "aws_route" "internet_access" {
 }
 
 # Create a subnet to launch our instances into
-resource "aws_subnet" "default" {
+resource "aws_subnet" "default_az1" {
   vpc_id                  = "${aws_vpc.default.id}"
-  cidr_block              = "10.0.1.0/24"
+  cidr_block              = "10.0.0.0/24"
+  availability_zone       = "eu-west-2a"
   map_public_ip_on_launch = true
 }
 
+resource "aws_subnet" "default_az2" {
+  vpc_id                  = "${aws_vpc.default.id}"
+  cidr_block              = "10.0.1.0/24"
+  availability_zone       = "eu-west-2b"
+  map_public_ip_on_launch = true
+}
+
+resource "aws_subnet" "app_az1" {
+  vpc_id                  = "${aws_vpc.default.id}"
+  cidr_block              = "10.0.5.0/24"
+  availability_zone       = "eu-west-2a"
+  map_public_ip_on_launch = true
+}
+
+resource "aws_subnet" "db_az1" {
+  vpc_id                  = "${aws_vpc.default.id}"
+  cidr_block              = "10.0.15.0/24"
+  availability_zone       = "eu-west-2a"
+  map_public_ip_on_launch = false
+}
+
+resource "aws_subnet" "app_az2" {
+  vpc_id                  = "${aws_vpc.default.id}"
+  cidr_block              = "10.0.130.0/24"
+  availability_zone       = "eu-west-2b"
+  map_public_ip_on_launch = true
+}
+
+resource "aws_subnet" "db_az2" {
+  vpc_id                  = "${aws_vpc.default.id}"
+  cidr_block              = "10.0.145.0/24"
+  availability_zone       = "eu-west-2b"
+  map_public_ip_on_launch = false
+}
+
+
+
 # A security group for the ELB so it is accessible via the web
-resource "aws_security_group" "elb" {
-  name        = "terraform_example_elb"
-  description = "Used in the terraform"
+resource "aws_security_group" "lb" {
+  name        = "sg_lb"
+  description = "ELB SG set up by terraform"
   vpc_id      = "${aws_vpc.default.id}"
 
   # HTTP access from anywhere
@@ -68,11 +109,38 @@ resource "aws_security_group" "elb" {
   }
 }
 
+resource "aws_security_group" "db" {
+  name        = "sg_db"
+  description = "Database SG set up by terraform"
+  vpc_id      = "${aws_vpc.default.id}"
+
+  # MYSQL access from App DMZ
+  ingress {
+    from_port   = 3306
+    to_port     = 3306
+    protocol    = "tcp"
+    cidr_blocks = ["10.0.2.0/24","10.0.130.0/24"]
+  }
+
+  # outbound internet access
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+resource "aws_db_subnet_group" "default" {
+  name       = "main"
+  subnet_ids = ["${aws_subnet.db_az1.id}","${aws_subnet.db_az2.id}"]
+}
+
 # Our default security group to access
 # the instances over SSH and HTTP
 resource "aws_security_group" "default" {
-  name        = "terraform_example"
-  description = "Used in the terraform"
+  name        = "default_sg"
+  description = "Default SG set up by terraform"
   vpc_id      = "${aws_vpc.default.id}"
 
   # SSH access from anywhere
@@ -100,19 +168,36 @@ resource "aws_security_group" "default" {
   }
 }
 
-resource "aws_elb" "web" {
-  name = "terraform-example-elb"
+resource "aws_lb" "web" {
+  name = "web-lb"
 
-  subnets         = ["${aws_subnet.default.id}"]
-  security_groups = ["${aws_security_group.elb.id}"]
-  instances       = ["${aws_instance.web.id}"]
+  subnets         = ["${aws_subnet.default_az1.id}","${aws_subnet.default_az2.id}"]
+  security_groups = ["${aws_security_group.lb.id}"]
 
-  listener {
-    instance_port     = 80
-    instance_protocol = "http"
-    lb_port           = 80
-    lb_protocol       = "http"
+}
+
+resource "aws_lb_listener" "web" {
+  load_balancer_arn = "${aws_lb.web.arn}"
+  port              = "80"
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = "${aws_lb_target_group.web.arn}"
   }
+}
+
+resource "aws_lb_target_group" "web" {
+  name     = "web-target-group"
+  port     = 80
+  protocol = "HTTP"
+  vpc_id   = "${aws_vpc.default.id}"
+}
+
+resource "aws_alb_target_group_attachment" "svc_web" {
+  target_group_arn = "${aws_lb_target_group.web.arn}"
+  target_id        = "${aws_instance.web.id}"  
+  port             = 80
 }
 
 resource "aws_key_pair" "auth" {
@@ -120,14 +205,27 @@ resource "aws_key_pair" "auth" {
   public_key = "${file(var.public_key_path)}"
 }
 
+resource "aws_db_instance" "appdb" {
+  allocated_storage    = 10
+  storage_type         = "gp2"
+  engine               = "mysql"
+  engine_version       = "5.7"
+  instance_class       = "db.t2.micro"
+  name                 = "appdb"
+  username             = "${data.vault_generic_secret.db_secrets.data["username"]}"
+  password             = "${data.vault_generic_secret.db_secrets.data["password"]}"
+  parameter_group_name = "default.mysql5.7"
+  db_subnet_group_name = "${aws_db_subnet_group.default.name}"
+  vpc_security_group_ids = ["${aws_security_group.db.id}"]
+}
+
+
 resource "aws_instance" "web" {
   # The connection block tells our provisioner how to
   # communicate with the resource (instance)
   connection {
     # The default username for our AMI
     user = "ubuntu"
-
-    # The connection will use the local SSH agent for authentication.
   }
 
   instance_type = "t2.micro"
@@ -138,14 +236,9 @@ resource "aws_instance" "web" {
 
   # The name of our SSH keypair we created above.
   key_name = "${aws_key_pair.auth.id}"
-
   # Our Security group to allow HTTP and SSH access
   vpc_security_group_ids = ["${aws_security_group.default.id}"]
-
-  # We're going to launch into the same subnet as our ELB. In a production
-  # environment it's more common to have a separate private subnet for
-  # backend instances.
-  subnet_id = "${aws_subnet.default.id}"
+  subnet_id = "${aws_subnet.app_az1.id}"
 
   # We run a remote provisioner on the instance after creating it.
   # In this case, we just install nginx and start it. By default,
